@@ -1,4 +1,4 @@
-from load_addr import *
+from .load_addr import *
 
 def incref(obj):
 	getmem(id(obj), PTR_SIZE).cast('n')[0] += 1

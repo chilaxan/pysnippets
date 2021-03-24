@@ -1,5 +1,5 @@
-from load_addr import *
-from util import *
+from .load_addr import *
+from .util import *
 
 type_cache = {}
 
