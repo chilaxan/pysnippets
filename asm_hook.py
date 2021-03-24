@@ -4,6 +4,7 @@ import atexit
 
 '''
 Allows for hooking internal C funtions and redirecting them to python code
+Originally used for grabbing a reference to the CPython interened strings table
 '''
 
 base_size = sizeof(c_void_p)
