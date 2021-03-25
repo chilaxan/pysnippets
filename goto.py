@@ -8,7 +8,7 @@ except:
 __all__ = ['goto', 'label']
 
 '''
-An implemntation of `goto` in pure python
+An implementation of `goto` in pure python
 '''
 
 def getframe(depth=0):

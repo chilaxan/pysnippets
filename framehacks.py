@@ -7,7 +7,7 @@ except:
         return memoryview((c_char*size).from_address(addr)).cast('B')
 
 '''
-A collection of various weird code that tend to use frames in weird ways
+A collection of various weird code that tend to use stack frames in weird ways
 '''
 
 # breaks in larger files that have EXTENDED_ARG before the JUMP_IF_FALSE_OR_POP
