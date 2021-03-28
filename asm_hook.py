@@ -40,7 +40,6 @@ def hook(cfunc, restype=c_int, argtypes=()):
     def wrapper(func):
         @cfunctype
         def injected(*args, **kwargs):
-            nonlocal mem, jmp, func
             try:
                 mem[:] = default
                 return func(*args, **kwargs)
@@ -52,7 +51,6 @@ def hook(cfunc, restype=c_int, argtypes=()):
         mem[:] = jmp
         @atexit.register
         def unhook():
-            nonlocal mem
             mem[:] = default
         injected.unhook = unhook
         return injected
