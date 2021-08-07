@@ -13,7 +13,7 @@ def mem_utils():
 		if size < 0:
 			raise Exception(f'cannot alloc {size} bytes')
 		array = bytearray(size)
-		ptr = int.from_bytes(getmem(id(array) + (PTR_SIZE * 4), PTR_SIZE), 'little')
+		ptr = int.from_bytes(getmem(id(array) + (PTR_SIZE * 4), PTR_SIZE), ENDIAN)
 		cache[ptr] = array
 		return ptr
 

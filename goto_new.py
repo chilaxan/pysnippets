@@ -19,38 +19,64 @@ def getframe(depth=0):
             frame = frame.f_back
         return frame
 
+def code_map(co_code):
+    idx = 0
+    mapping = {}
+    while co_code:
+        op, arg, co_code = co_code[:2], co_code[2:]
+        if op == 0x90:pass
+
+def parse_opargs(code):
+    extended_arg = 0
+    for i in range(0, len(code), 2):
+        op = code[i]
+        arg = code[i+1] | extended_arg
+        extended_arg = (arg << 8) if op == 0x90 else 0
+        if op != 0x90:
+            yield (i, op, arg)
+
+import dis
+
 def get_dest(frame, label):
     code, names = frame.f_code.co_code, frame.f_code.co_names
     frame_var = {**frame.f_globals, **frame.f_locals}.get
-    ops, args = code[::2], code[1::2]
-    for idx, (op, arg) in enumerate(zip(ops, args)):
+    last_arg = None
+    for idx, op, arg in parse_opargs(code):
         if op == 106 and names[arg] == label and \
-           isinstance(frame_var(names[args[idx - 1]]), Label):
-                return (idx - 1) * 2
+           isinstance(frame_var(names[last_arg]), Label):
+                return idx - 1
+        last_arg = arg
     raise RuntimeError(f'label {label!r} not found')
 
-def set_instr(code, idx, op, arg):
+def patch_instr(code, idx, size, data):
     code_addr = id(code) + bytes.__basicsize__ - 1
-    mem = getmem(code_addr, len(code))
-    (op, arg), mem[idx:idx + 2] = mem[idx:idx + 2], bytes((op, arg))
-    return op, arg
+    mem = getmem(code_addr + idx, size)
+    old = mem.tobytes()
+    mem[:] = data
+    return old
 
-restore_instr = [None, None, None]
+to_fix = [None, None, None] # idx, size, data
 
 class Goto:
     def __getattr__(self, label):
         code = (frame := getframe(1)).f_code.co_code
         idx = frame.f_lasti + 2
-        op, arg = set_instr(code, idx, 114, get_dest(frame, label))
-        restore_instr[:3] = (idx, op, arg)
+        dest = get_dest(frame, label)
+        inj = bytes((0x72, dest & 0xff))
+        dest >>= 8
+        while dest > 0:
+            inj = bytes((0x90, dest & 0xff)) + inj
+            dest >>= 8
+        old = patch_instr(code, idx, len(inj), inj)
+        to_fix[:] = idx, len(old), old
     __mul__ = __getattr__
 
 class Label:
     def __getattr__(self, name):
-        if None not in restore_instr:
+        if None not in to_fix:
             frame = getframe(1)
-            set_instr(frame.f_code.co_code, *restore_instr)
-            restore_instr[:3] = (None, None, None)
+            patch_instr(frame.f_code.co_code, *to_fix)
+            to_fix[:] = None, None, None
 
 goto = Goto()
 label = Label()

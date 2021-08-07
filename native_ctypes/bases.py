@@ -106,7 +106,7 @@ class c_data(metaclass=c_meta):
             raise
 
     def __repr__(self):
-        return f'{type(self)}({flatten(self.value)})'
+        return f'{type(self)}({flatten(self.value)!r})'
 
     def _pre_init_(self, args):
         pass
@@ -176,13 +176,25 @@ class complex_data(c_data):
         if attr not in [fld for fld, _ in self._fields_]:
             return super().__getattribute__(attr)
         else:
-            return self.by_name(attr).value
+            raw = self.by_name(attr)
+            if type(raw).__base__ == c_data:
+                return raw.value
+            else:
+                return raw
 
     def __setattr__(self, attr, value):
         if attr not in [fld for fld, _ in self._fields_]:
             super().__setattr__(attr, value)
         else:
-            self.by_name(attr).value = value
+            raw = self.by_name(attr)
+            if type(raw).__base__ == c_data:
+                raw.value = value
+            else:
+                assert raw._size_ == value._size_
+                memcpy(raw.addr, value.addr, raw._size_)
+
+    def __dir__(self):
+        return super().__dir__() + [fld for fld, _ in self._fields_]
 
     def _get_(self):
         return {fld:getattr(self,fld) for fld, _ in self._fields_}

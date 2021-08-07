@@ -70,8 +70,8 @@ def f():
 # removes the traceback of the function internals
 # inject raise after upper function
 # use as `return builtinexc(exc)`
-def builtinexc(exc):
-    frame = sys._getframe(2)
+def builtinexc(exc, level=0):
+    frame = sys._getframe(2 + level)
     mem = getmem(id(frame.f_code.co_code) + bytes.__basicsize__ - 1, len(frame.f_code.co_code))
     mem[frame.f_lasti + 2:frame.f_lasti + 4] = bytes([dis.opmap['RAISE_VARARGS'], 1])
     return exc
@@ -95,3 +95,82 @@ def rerun(*new_flags, keep_old=True):
         os.execv(orig_argv[0], orig_argv)
     else:
         os.execv(orig_argv[0], (orig_argv[0],) + new_flags)
+
+import gc
+
+class magic:
+    def __length_hint__(self):
+        return 1
+    def __iter__(self):
+        for obj in gc.get_objects():
+            if type(obj) == tuple and len(obj) == 1:
+                try:1 in obj
+                except SystemError:
+                    yield obj
+                    break
+
+weird = tuple(magic())
+
+# fishhook research
+
+# A-E are unknown size arrays
+
+'''
+(PyHeapTypeObject) [
+  (PyTypeObject) [
+  ...
+  -> A
+  ...
+  -> C
+  -> B
+  -> D
+  ...
+  -> E
+  ]
+  A
+  B
+  C
+  D
+  E
+  ...
+]
+'''
+
+# 1. Collect ptr values to get starting addresses of A-E by looking for pointers that direct within PyHeapTypeObject
+from ctypes import (
+    sizeof,
+    c_void_p,
+    c_char
+)
+
+basic_size = sizeof(c_void_p)
+
+def mem(addr, size):
+    return (c_char*size).from_address(addr)
+
+class HeapTypeObj:
+    __slots__ = ()
+
+size = type(HeapTypeObj).__sizeof__(HeapTypeObj)
+static_size = type.__sizeof__(type)
+cls_mem = mem(id(HeapTypeObj), size).raw
+address = id(HeapTypeObj)
+pointers = [(offset, ptr) for offset, ptr in enumerate(memoryview(cls_mem).cast('l'))
+                if address < ptr < address + len(cls_mem)]
+
+# 2. Get Differences between ptr[B]-ptr[A], ... to get sizes
+sizes = []
+last_addr = None
+for offset, ptr in sorted(pointers, key=lambda i:i[1]):
+    if last_addr is not None:
+        sizes.append(ptr - last_addr)
+    last_addr = ptr
+
+sizes.append(last_addr - ptr + len(cls_mem))
+
+# 3. We now know the offsets and sizes of ptr[A-E] in PyTypeObject
+structs = [(0, static_size)] \
+        + [(offset, size) for (offset, _), size in zip(pointers, sizes)]
+
+# 4. Now comes the fun part
+# see fishhook

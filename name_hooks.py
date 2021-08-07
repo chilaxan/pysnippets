@@ -84,3 +84,19 @@ def better_name_errors():
     provides some slightly more user friendly Name errors
     '''
     init_missing_hook(sys._getframe(1).f_globals, advanced_name_error)
+
+import warnings, importlib.util
+def auto_import(dct, name):
+    if importlib.util.find_spec(name):
+        warnings.warn(f'implicitly importing module {name!r}', RuntimeWarning, 3)
+        mod = __import__(name)
+        dct[name] = mod
+        return mod
+    else:
+        return builtinexc(NameError(f'name {name!r} is not defined'), 2)
+
+def implicit_imports():
+    '''
+    implicitly import modules
+    '''
+    init_missing_hook(sys._getframe(1).f_globals, auto_import)

@@ -6,7 +6,7 @@
 # call function in asm
 # return function result `ret`?
 
-from load_addr import *
+from .load_addr import *
 from native_ctypes import *
 
 class PyMethodDef(c_struct):
@@ -30,10 +30,10 @@ def call_function(addr, arg1=0, arg2=0, arg3=0):
     func_s = PyCFunctionObj({
         'ob_refcnt': 1,
         'ob_base': type(print),
-        'm_ml': PyMethodDef({
+        'm_ml': c_ptr[PyMethodDef](PyMethodDef({
             'ml_meth': addr,
             'ml_flags': 1|2
-        }),
+        })),
         'm_self': arg1
     })
     func = load_addr(addressof(func_s))
@@ -48,12 +48,12 @@ def builtin(func):
     func_s = PyCFunctionObj({
         'ob_refcnt': 1,
         'ob_base': type(print),
-        'm_ml': PyMethodDef({
+        'm_ml': c_ptr[PyMethodDef](PyMethodDef({
             'ml_name': func.__name__.encode(),
-            'ml_meth': TypeObj.from_address(id(type(func))).tp_call,
+            'ml_meth': PyTypeObject.from_address(id(type(func))).tp_call,
             'ml_flags': 1|2,
             'ml_doc': (func.__doc__ or '').encode() or NULL
-        }),
+        })),
         'm_self': func,
         'm_module': func.__module__
     })

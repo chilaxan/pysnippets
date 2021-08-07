@@ -128,7 +128,92 @@ class TupleObj(PyVarObject):
 class LongObj(PyVarObject):
     ob_digit: field(lambda inst:c_int*abs(inst.ob_size))
 
-class TypeObj(PyVarObject):
+class PyAsyncMethods(c_struct):
+    am_await: c_void_p
+    am_aiter: c_void_p
+    am_anext: c_void_p
+    am_send: c_void_p
+
+class PyNumberMethods(c_struct):
+    nb_add: c_void_p
+    nb_subtract: c_void_p
+    nb_multiply: c_void_p
+    nb_remainder: c_void_p
+    nb_divmod: c_void_p
+    nb_power: c_void_p
+    nb_negative: c_void_p
+    nb_positive: c_void_p
+    nb_absolute: c_void_p
+    nb_bool: c_void_p
+    nb_invert: c_void_p
+    nb_lshift: c_void_p
+    nb_rshift: c_void_p
+    nb_and: c_void_p
+    nb_xor: c_void_p
+    nb_or: c_void_p
+    nb_int: c_void_p
+    nb_reserved: c_void_p
+    nb_float: c_void_p
+    nb_inplace_add: c_void_p
+    nb_inplace_subtract: c_void_p
+    nb_inplace_multiply: c_void_p
+    nb_inplace_remainder: c_void_p
+    nb_inplace_power: c_void_p
+    nb_inplace_lshift: c_void_p
+    nb_inplace_rshift: c_void_p
+    nb_inplace_and: c_void_p
+    nb_inplace_xor: c_void_p
+    nb_inplace_or: c_void_p
+    nb_floor_divide: c_void_p
+    nb_true_divide: c_void_p
+    nb_inplace_floor_divide: c_void_p
+    nb_inplace_true_divide: c_void_p
+    nb_index: c_void_p
+    nb_matrix_multiply: c_void_p
+    nb_inplace_matrix_multiply: c_void_p
+
+class PySequenceMethods(c_struct):
+    sq_length: c_void_p
+    sq_concat: c_void_p
+    sq_repeat: c_void_p
+    sq_item: c_void_p
+    was_sq_slice: c_void_p
+    sq_ass_item: c_void_p
+    was_sq_ass_slice: c_void_p
+    sq_contains: c_void_p
+    sq_inplace_concat: c_void_p
+    sq_inplace_repeat: c_void_p
+
+class PyMappingMethods(c_struct):
+    mp_length: c_void_p
+    mp_subscript: c_void_p
+    mp_ass_subscript: c_void_p
+
+class PyBufferProcs(c_struct):
+    bf_getbuffer: c_void_p
+    bf_releasebuffer: c_void_p
+
+class PyMethodDef(c_struct):
+    name: c_char_p
+    meth: c_void_p
+    flags: c_long
+    doc: c_char_p
+
+class PyMemberDef(c_struct):
+    name: c_char_p
+    type: c_long
+    offset: c_long
+    flags: c_long
+    doc: c_char_p
+
+class PyGetSetDef(c_struct):
+    name: c_char_p
+    get: c_void_p
+    set: c_void_p
+    doc: c_char_p
+    closure: c_void_p
+
+class PyTypeObject(PyVarObject):
     tp_name: c_char_p
     tp_basicsize: c_long
     tp_itemsize: c_long
@@ -136,77 +221,17 @@ class TypeObj(PyVarObject):
     tp_vectorcall_offset: c_ssize_t
     tp_getattr: c_void_p
     tp_setattr: c_void_p
-    tp_as_async: c_ptr[anon('PyAsyncMethods', c_struct,
-        am_await=c_void_p,
-        am_aiter=c_void_p,
-        am_anext=c_void_p,
-        am_send=c_void_p
-    )]
+    tp_as_async: c_ptr[PyAsyncMethods]
     tp_repr: c_void_p
-    tp_as_number: c_ptr[anon('PyNumberMethods', c_struct,
-        nb_add=c_void_p,
-        nb_subtract=c_void_p,
-        nb_multiply=c_void_p,
-        nb_remainder=c_void_p,
-        nb_divmod=c_void_p,
-        nb_power=c_void_p,
-        nb_negative=c_void_p,
-        nb_positive=c_void_p,
-        nb_absolute=c_void_p,
-        nb_bool=c_void_p,
-        nb_invert=c_void_p,
-        nb_lshift=c_void_p,
-        nb_rshift=c_void_p,
-        nb_and=c_void_p,
-        nb_xor=c_void_p,
-        nb_or=c_void_p,
-        nb_int=c_void_p,
-        nb_reserved=c_void_p,
-        nb_float=c_void_p,
-        nb_inplace_add=c_void_p,
-        nb_inplace_subtract=c_void_p,
-        nb_inplace_multiply=c_void_p,
-        nb_inplace_remainder=c_void_p,
-        nb_inplace_power=c_void_p,
-        nb_inplace_lshift=c_void_p,
-        nb_inplace_rshift=c_void_p,
-        nb_inplace_and=c_void_p,
-        nb_inplace_xor=c_void_p,
-        nb_inplace_or=c_void_p,
-        nb_floor_divide=c_void_p,
-        nb_true_divide=c_void_p,
-        nb_inplace_floor_divide=c_void_p,
-        nb_inplace_true_divide=c_void_p,
-        nb_index=c_void_p,
-        nb_matrix_multiply=c_void_p,
-        nb_inplace_matrix_multiply=c_void_p
-    )]
-    tp_as_sequence: c_ptr[anon('PySequenceMethods', c_struct,
-        sq_length=c_void_p,
-        sq_concat=c_void_p,
-        sq_repeat=c_void_p,
-        sq_item=c_void_p,
-        was_sq_slice=c_void_p,
-        sq_ass_item=c_void_p,
-        was_sq_ass_slice=c_void_p,
-        sq_contains=c_void_p,
-        sq_inplace_concat=c_void_p,
-        sq_inplace_repeat=c_void_p
-    )]
-    tp_as_mapping: c_ptr[anon('PyMappingMethods', c_struct,
-        mp_length=c_void_p,
-        mp_subscript=c_void_p,
-        mp_ass_subscript=c_void_p
-    )]
+    tp_as_number: c_ptr[PyNumberMethods]
+    tp_as_sequence: c_ptr[PySequenceMethods]
+    tp_as_mapping: c_ptr[PyMappingMethods]
     tp_hash: c_void_p
     tp_call: c_void_p
     tp_str: c_void_p
     tp_getattro: c_void_p
     tp_setattro: c_void_p
-    tp_as_buffer: c_ptr[anon('PyBufferProcs', c_struct,
-         bf_getbuffer=c_void_p,
-         bf_releasebuffer=c_void_p
-    )]
+    tp_as_buffer: c_ptr[PyBufferProcs]
     tp_flags: c_ulong
     tp_doc: c_char_p
     tp_traverse: c_void_p
@@ -215,26 +240,9 @@ class TypeObj(PyVarObject):
     tp_weaklistoffset: c_long
     tp_iter: c_void_p
     tp_iternext: c_void_p
-    tp_methods: c_ptr[anon('PyMethodDef', c_struct,
-        name=c_char_p,
-        meth=c_void_p,
-        flags=c_long,
-        doc=c_char_p
-    )*None]
-    tp_members: c_ptr[anon('PyMemberDef', c_struct,
-        name=c_char_p,
-        type=c_long,
-        offset=c_long,
-        flags=c_long,
-        doc=c_char_p
-    )*None]
-    tp_getset: c_ptr[anon('PyGetSetDef', c_struct,
-        name=c_char_p,
-        get=c_void_p,
-        set=c_void_p,
-        doc=c_char_p,
-        closure=c_void_p
-    )*None]
+    tp_methods: c_ptr[PyMethodDef*None]
+    tp_members: c_ptr[PyMemberDef*None]
+    tp_getset: c_ptr[PyGetSetDef*None]
     tp_base: py_object
     tp_dict: py_object
     tp_descr_get: c_void_p
@@ -254,6 +262,19 @@ class TypeObj(PyVarObject):
     tp_version_tag: c_ulong
     tp_finalize: c_void_p
     tp_vectorcall: c_void_p
+
+class PyHeapTypeObject(c_struct):
+    ht_type: PyTypeObject
+    as_async: PyAsyncMethods
+    as_number: PyNumberMethods
+    as_mapping: PyMappingMethods
+    as_sequence: PySequenceMethods
+    as_buffer: PyBufferProcs
+    ht_name: py_object
+    ht_slots: py_object
+    ht_qualname: c_void_p #py_object # this field seems to always be corrupted?
+    ht_cached_keys: c_void_p
+    ht_module: py_object
 
 def PyType_Modified(typ):
     if (typ.__flags__ & (1 << 19)) == 0:

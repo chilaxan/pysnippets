@@ -14,6 +14,7 @@ PAGE_SIZE = libc.getpagesize()
 MEM_READ = 1
 MEM_WRITE = 2
 MEM_EXEC = 4
+ENDIAN = 'little' if memoryview(b'\1\0').cast('h')[0]==1 else 'big'
 
 libc.mprotect.argtypes = (c_void_p, c_size_t, c_int)
 libc.mprotect.restype = c_int
@@ -47,7 +48,7 @@ def hook(cfunc, restype=c_int, argtypes=()):
                 mem[:] = jmp
         n_ptr = addr(injected)
         offset = n_ptr - o_ptr - 5
-        jmp = b'\xe9' + (offset & ((1 << 32) - 1)).to_bytes(4, 'little')
+        jmp = b'\xe9' + (offset & ((1 << 32) - 1)).to_bytes(4, ENDIAN)
         mem[:] = jmp
         @atexit.register
         def unhook():
