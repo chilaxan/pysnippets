@@ -1,7 +1,6 @@
 from ctypes import *
 from _ctypes import Py_INCREF, Py_DECREF
 from collections.abc import MutableMapping
-import reprlib
 import sys
 
 base_size = sizeof(c_void_p)
