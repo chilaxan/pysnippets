@@ -1,6 +1,6 @@
 import sys
 import fishhook
-import f_locals # see github.com/chilaxan/pysnippets/blob/main/f_locals.py
+import f_locals
 import dis
 from ctypes import *
 
