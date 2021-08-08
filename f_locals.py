@@ -104,7 +104,7 @@ getclsdict(FrameType)['__invert__'] = lambda frame: f_locals(frame)
 # NOTE: This does not enable `~frame == frame.f_locals`
 #       To do that, `FrameType.tp_as_number.nb_invert` must be set
 
-__builtins__.locals = lambda:sys._getframe(1).f_locals
+(__builtins__ if isinstance(__builtins__, dict) else __builtins__.__dict__)['locals'] = lambda:sys._getframe(1).f_locals
 
 def test_reassign():
     abc = 'Old Value'

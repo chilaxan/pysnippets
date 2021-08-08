@@ -119,7 +119,7 @@ class FloatObj(PyObject):
     ob_fval: c_double
 
 class ListObj(PyVarObject):
-    ob_item: field(lambda inst:c_ptr[py_object*inst.ob_size], c_ptr._size_)
+    ob_item: field(lambda inst:c_ptr[c_void_p*inst.ob_size], c_ptr._size_)
     allocated: c_ulong
 
 class TupleObj(PyVarObject):
@@ -127,6 +127,30 @@ class TupleObj(PyVarObject):
 
 class LongObj(PyVarObject):
     ob_digit: field(lambda inst:c_int*abs(inst.ob_size))
+
+class DictKeyEntry(c_struct):
+    me_hash: c_ssize_t
+    me_key: py_object
+    me_value: py_object
+
+class DictKeys(c_struct):
+    dk_refcnt: c_ssize_t
+    dk_size: c_ssize_t
+    dict_lookup_func: c_void_p
+    dk_usable: c_ssize_t
+    dk_nentries: c_ssize_t
+    dk_indices: field(lambda inst:(typ:=(c_byte if (sz:=inst.dk_size) <= 128 else \
+                                        c_short if 256 <= sz <= 2**15 else \
+                                        c_int if 2**16 <= sz <= 2**31 else c_long)) * inst.dk_nentries)
+    dk_huh: c_void_p # dicts use confusing logic, this stuff is wrong
+    dk_entries: field(lambda inst:DictKeyEntry * inst.dk_nentries)
+
+class DictObj(PyObject):
+    ma_used: c_ssize_t
+    ma_version_tag: c_ulong
+    ma_keys: c_ptr[DictKeys]
+    ma_values: field(lambda inst:c_ptr[py_object*inst.ma_used], c_ptr._size_)
+
 
 class PyAsyncMethods(c_struct):
     am_await: c_void_p
