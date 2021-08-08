@@ -26,6 +26,7 @@ def __iter__(self):
     else:
         yield from fishhook.orig(self)
         return
+    exino = 0
     for num in counts:
         ino += 2
         while num:
@@ -33,12 +34,14 @@ def __iter__(self):
             ino += 2
             num -= 1
         if ex:
-            ex_name = get_name(*code.co_code[ino: ino + 2])
-            op_name = dis.opname[code.co_code[ino]]
-            if op_name in ['STORE_GLOBAL', 'STORE_NAME']:
-                frame.f_globals[ex_name] = copy
-            elif op_name == 'STORE_FAST':
-                frame.f_locals[ex_name] = copy
-            address = id(code.co_code) + bytes.__basicsize__ - 1 + ino
-            c_byte.from_address(address).value = dis.opmap['POP_TOP']
+            exino = ino
             ex = False
+    if exino:
+        ex_name = get_name(*code.co_code[exino: exino + 2])
+        op_name = dis.opname[code.co_code[exino]]
+        if op_name in ['STORE_GLOBAL', 'STORE_NAME']:
+            frame.f_globals[ex_name] = copy
+        elif op_name == 'STORE_FAST':
+            frame.f_locals[ex_name] = copy
+        address = id(code.co_code) + bytes.__basicsize__ - 1 + exino
+        c_byte.from_address(address).value = dis.opmap['POP_TOP']
