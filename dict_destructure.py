@@ -2,7 +2,7 @@ import sys
 import fishhook
 import f_locals
 import dis
-from ctypes import *
+from ctypes import c_byte
 
 @fishhook.hook(dict)
 def __iter__(self):
