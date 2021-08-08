@@ -14,6 +14,7 @@ def __iter__(self):
     get_name = lambda op, arg:{
         'STORE_FAST': code.co_varnames
     }.get(dis.opname[op], code.co_names)[arg]
+    get_name = lambda op, arg:[code.co_names, code.co_varnames][op == dis.op_map['STORE_FAST']][arg]
     copy = self.copy()
     ex = dis.opname[op] == 'UNPACK_EX'
     if dis.opname[op] in ('UNPACK_SEQUENCE', 'UNPACK_EX'):
