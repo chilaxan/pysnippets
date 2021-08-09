@@ -38,11 +38,20 @@ def __iter__(self):
             exino = ino
             ex = False
     if exino:
-        ex_name = get_name(*code.co_code[exino: exino + 2])
-        op_name = dis.opname[code.co_code[exino]]
+        op, arg = code.co_code[exino: exino + 2]
+        op_name = dis.opname[op]
+        ex_name = get_name(op, arg)
         if op_name in ['STORE_GLOBAL', 'STORE_NAME']:
             frame.f_globals[ex_name] = copy
         elif op_name == 'STORE_FAST':
             frame.f_locals[ex_name] = copy
         address = id(code.co_code) + bytes.__basicsize__ - 1 + exino
         c_byte.from_address(address).value = dis.opmap['POP_TOP']
+        def tfunc(*args):
+            if getattr(tfunc, 'flag', False):
+                c_byte.from_address(address).value = op
+                sys.settrace(None)
+            else:
+                tfunc.flag = True
+                return tfunc
+        sys.settrace(tfunc)
