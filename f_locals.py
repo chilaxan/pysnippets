@@ -6,10 +6,7 @@ import sys
 base_size = sizeof(c_void_p)
 FrameType = type(sys._getframe())
 
-@lambda c:c()
-class Null:
-    def __repr__(self):
-        return '<NULL>'
+Null = type('',(),{'__repr__':lambda s:'<NULL>'})()
 
 class f_locals(MutableMapping):
     __invert__ = None
