@@ -42,7 +42,8 @@ def unary_hook(self, frame):
         self -= inc // 2
     else:
         self += inc // 2
-    handlers.get(load_op, lambda *a:None)(frame, load_arg, self)
+    if func := handlers.get(load_op):
+        func(frame, load_arg, self)
     address = id(co_code) + bytes.__basicsize__ - 1 + frame.f_lasti
     for i in range(inc):
         c_byte.from_address(address + (i * 2)).value = dis.opmap['NOP']
