@@ -39,9 +39,9 @@ def unary_hook(self, frame):
         else:
             break
     if unary_op == dis.opmap['UNARY_NEGATIVE']:
-        self -= 1 * (inc // 2)
+        self -= inc // 2
     else:
-        self += 1 * (inc // 2)
+        self += inc // 2
     handlers.get(load_op, lambda *a:None)(frame, load_arg, self)
     address = id(co_code) + bytes.__basicsize__ - 1 + frame.f_lasti
     for i in range(inc):
