@@ -174,3 +174,136 @@ structs = [(0, static_size)] \
 
 # 4. Now comes the fun part
 # see fishhook
+
+def args_type(atyp=None, kwtyp=None):
+    def wrapper(func):
+        code = func.__code__
+        flags = code.co_flags
+        argcount = code.co_argcount
+        if atyp is not None:
+            flags -= flags & 0x4
+            argcount += 1
+        if kwtyp is not None:
+            flags -= flags & 0x8
+            argcount += 1
+        func.__code__ = code.replace(
+            co_flags = flags,
+            co_argcount = argcount
+        )
+        def wrapped(*args, **kwargs):
+            return func(
+                *args[:code.co_argcount],
+                *() if atyp is None else [atyp(args[code.co_argcount:])],
+                *() if kwtyp is None else [kwtyp(kwargs)]
+            )
+        return wrapped
+    return wrapper
+
+from dataclasses import dataclass
+
+@dataclass
+class Foo:
+    a: int
+    b: int
+
+    @classmethod
+    def from_dict(cls, dct):
+        return cls(**dct)
+
+@args_type(list, Foo.from_dict)
+def foo_func(*args, **kwargs):
+    print(args, kwargs)
+
+foo_func('a', 'b', a=1, b=2)
+
+import dis, sys
+
+old_import = __builtins__.__import__
+
+def my_import(name, globals=None, locals=None, fromlist=(), level=0):
+    try:
+        frame = sys._getframe(1)
+    except:
+        return old_import(name, globals, locals, fromlist, level)
+    loc = frame.f_globals["__name__"]
+    code = frame.f_code
+    co_code = code.co_code
+    lasti = frame.f_lasti
+    #for val in (fromlist or [])
+    next_op = dis.opname[co_code[lasti + 2]]
+    next_arg = co_code[lasti + 3]
+    fl = ', '.join(fromlist) + ' from ' if fromlist else ''
+    if 'STORE_' in next_op:
+        if next_op in ['STORE_GLOBAL', 'STORE_NAME']:
+            print(f'importing {fl}{name} as {code.co_names[next_arg]} in {loc}.{code.co_name}')
+        else:
+            print(f'importing {fl}{name} as {code.co_varnames[next_arg]} in {loc}.{code.co_name}')
+    else:
+        print(f'importing {fl}{name} in {loc}.{code.co_name}')
+    return old_import(name, globals, locals, fromlist, level)
+
+#__builtins__.__import__ = my_import
+
+import os
+
+import sys
+import dis
+
+class name_aware:
+    def __init__(self):
+        frame = None
+        level = 1
+        while frame is None or 'STORE_' not in (op := dis.opname[
+            (bc := (code := frame.f_code).co_code)[(idx := frame.f_lasti + 2)]
+        ]):
+            try:
+                frame = sys._getframe(level)
+            except ValueError:
+                self.__inst_name__ = None
+                return
+            level += 1
+        if op in ['STORE_GLOBAL', 'STORE_NAME']:
+            self.__inst_name__ = code.co_names[bc[idx + 1]]
+        elif op == 'STORE_FAST':
+            self.__inst_name__ = code.co_varnames[bc[idx + 1]]
+        else:
+            self.__inst_name__ = None
+
+    def __repr__(self):
+        if self.__inst_name__:
+            return f'{self.__inst_name__} = {super().__repr__()}'
+        else:
+            return super().__repr__()
+
+
+class a(name_aware):pass
+
+class b(name_aware):
+    def __init__(self, arg):
+        ...
+        super().__init__()
+
+load_addr = type(m:=lambda n,s:lambda v:s(v)or n)(
+    (M:=m.__code__).replace(
+        co_code=b'\x88'+M.co_code[1:]
+    ),{}
+)(r:=iter(range(2**63-1)),r.__setstate__)
+
+from ctypes import pythonapi, py_object, sizeof
+PyType_Modified = pythonapi.PyType_Modified
+PyType_Modified.argtypes = [py_object]
+
+def getdict(cls):
+    dct = cls.__dict__
+    if type(dct) == dict:
+        return dct
+    return py_object.from_address(id(dct) + 2 * sizeof(py_object)).value
+
+old_format = str.format
+def new_format(self, *args, **kwargs):
+    if args:
+        return old_format(self, *args, **kwargs)
+    return eval('f' + repr(self), {**globals(), **kwargs})
+
+getdict(str)['format'] = new_format
+PyType_Modified(str)
