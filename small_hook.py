@@ -10,13 +10,11 @@ def sizeof(obj):
     return type(obj).__sizeof__(obj)
 
 def make_getmem():
-    def load_addr(a):
-        m = lambda n:lambda:n
-        m.__code__ = (M:=m.__code__).replace(
-            co_consts=(c:=M.co_consts)+(r:=iter(range(a+1)),),
-            co_code=M.co_code.replace(b'\x87\0',bytes([100,len(c)])),
-        )
-        return r.__setstate__(a) or m(0)()
+    load_addr = type(m:=lambda n,s:lambda v:s(v)or n)(
+        (M:=m.__code__).replace(
+            co_code=b'\x88'+M.co_code[1:]
+        ),{}
+    )(r:=iter(range(2**63-1)),r.__setstate__)
 
     memory_backing = bytes(PTR_SIZE) \
                    + id(bytearray).to_bytes(PTR_SIZE, ENDIAN) \

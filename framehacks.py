@@ -175,46 +175,67 @@ structs = [(0, static_size)] \
 # 4. Now comes the fun part
 # see fishhook
 
-def args_type(atyp=None, kwtyp=None):
-    def wrapper(func):
-        code = func.__code__
-        flags = code.co_flags
-        argcount = code.co_argcount
-        if atyp is not None:
-            flags -= flags & 0x4
-            argcount += 1
-        if kwtyp is not None:
+import inspect
+def conv_args(func):
+    code = func.__code__
+    flags = code.co_flags
+    argcount = code.co_argcount
+    converters = []
+    kwarg_conv = None
+    arg_conv = None
+    for name, param in inspect.signature(func).parameters.items():
+        if param.annotation is not param.empty:
+            conv = param.annotation
+        else:
+            conv = lambda a:a
+        if not param.kind & (param.VAR_KEYWORD | param.VAR_POSITIONAL):
+            converters.append(conv)
+        elif param.kind & param.VAR_KEYWORD:
             flags -= flags & 0x8
             argcount += 1
-        func.__code__ = code.replace(
-            co_flags = flags,
-            co_argcount = argcount
+            kwarg_conv = conv
+        elif param.kind & param.VAR_POSITIONAL:
+            flags -= flags & 0x4
+            argcount += 1
+            arg_conv = conv
+    func.__code__ = code.replace(
+        co_flags = flags,
+        co_argcount = argcount,
+    )
+    def wrapper(*args, **kwargs):
+        return func(
+            *(conv(arg) for conv, arg in zip(converters, args[:code.co_argcount])),
+            *() if arg_conv is None else [arg_conv(args[code.co_argcount:])],
+            *() if kwarg_conv is None else [kwarg_conv(kwargs)]
         )
-        def wrapped(*args, **kwargs):
-            return func(
-                *args[:code.co_argcount],
-                *() if atyp is None else [atyp(args[code.co_argcount:])],
-                *() if kwtyp is None else [kwtyp(kwargs)]
-            )
-        return wrapped
+    return wrapper
+
+def verify(typ):
+    def wrapper(arg):
+        assert isinstance(arg, typ), f'{arg!r} is not an instance of {typ!r}'
+        return arg
     return wrapper
 
 from dataclasses import dataclass
 
 @dataclass
 class Foo:
-    a: int
-    b: int
+    a: int = None
+    b: int = None
 
     @classmethod
     def from_dict(cls, dct):
         return cls(**dct)
 
-@args_type(list, Foo.from_dict)
-def foo_func(*args, **kwargs):
-    print(args, kwargs)
+@conv_args
+def foo_func(a:int, b: tuple, *args: list, **kwargs: Foo.from_dict):
+    print(a, b, args, kwargs)
 
-foo_func('a', 'b', a=1, b=2)
+foo_func('1', 'string', 'a', 'b', a=1, b=2)
+
+@conv_args
+def int_add(a: verify(int), b: verify(int)):
+    return a + b
 
 import dis, sys
 
@@ -253,8 +274,8 @@ class name_aware:
     def __init__(self):
         frame = None
         level = 1
-        while frame is None or 'STORE_' not in (op := dis.opname[
-            (bc := (code := frame.f_code).co_code)[(idx := frame.f_lasti + 2)]
+        while frame is None or 'STORE_' not in (op:=dis.opname[
+            (bc:=(code:=frame.f_code).co_code)[(idx:=frame.f_lasti + 2)]
         ]):
             try:
                 frame = sys._getframe(level)
@@ -289,21 +310,23 @@ load_addr = type(m:=lambda n,s:lambda v:s(v)or n)(
     ),{}
 )(r:=iter(range(2**63-1)),r.__setstate__)
 
-from ctypes import pythonapi, py_object, sizeof
+from ctypes import pythonapi, py_object
+import sys
 PyType_Modified = pythonapi.PyType_Modified
 PyType_Modified.argtypes = [py_object]
 
-def getdict(cls):
-    dct = cls.__dict__
-    if type(dct) == dict:
-        return dct
-    return py_object.from_address(id(dct) + 2 * sizeof(py_object)).value
+load_off3 = type(m:=lambda n:(lambda:n)())(
+    (M:=m.__code__).replace(
+        co_code=b'\x88'+M.co_code[1:]
+    ),{}
+)
 
 old_format = str.format
 def new_format(self, *args, **kwargs):
     if args:
         return old_format(self, *args, **kwargs)
-    return eval('f' + repr(self), {**globals(), **kwargs})
+    f = sys._getframe(1)
+    return eval('f' + repr(self), f.f_globals, {**f.f_locals, **kwargs})
 
-getdict(str)['format'] = new_format
+load_off3(str.__dict__)['format'] = new_format
 PyType_Modified(str)

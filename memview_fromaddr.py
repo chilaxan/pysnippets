@@ -11,6 +11,6 @@ def getmem(addr, size):
 
 @classmethod
 def from_address(cls, addr, size, fmt='c'):
-    return cls(getmem(addr, size)).cast(fmt)
+    return cls(getmem(addr, size)).cast('c').cast(fmt)
 
 mp_dict['from_address'] = from_address

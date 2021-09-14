@@ -1,25 +1,32 @@
-from ctypes import py_object, c_char
-import atexit, builtins, sys, dis, random
-
-def builtinexc(exc, depth=1):
-    frame = sys._getframe(1 + depth)
-    addr = id(frame.f_code.co_code) + bytes.__basicsize__ - 1
-    mem = (c_char * len(frame.f_code.co_code)).from_address(addr)
-    mem[frame.f_lasti + 2:frame.f_lasti + 4] = bytes([dis.opmap['RAISE_VARARGS'], 1])
-    return exc
-
-def maybe_get(dct, name):
-    if name == 'Maybe':
-        return random.random() < 0.5
-    else:
-        return builtinexc(NameError(f'name {name!r} is not defined'), 2)
-
-def maybe_set(dct, name, value):
-    if name != 'Maybe':
-        return True
-    raise SyntaxError(f'cannot assign to Maybe')
+from ctypes import py_object, sizeof
+import builtins, sys, random
 
 def maybe():
     g = sys._getframe(1).f_globals
-    tp_base = py_object.from_address(id(g) + sizeof(c_void_p))
-    class maybe_dict:pass
+    if 'Maybe' in g:
+        del g['Maybe']
+    tp_base = py_object.from_address(id(g) + sizeof(py_object))
+    class maybe_dict(dict):
+        __slots__ = ()
+        def __getitem__(self, key, tp_base=tp_base, dict=dict):
+            try:
+                tp_base.value = dict
+                if key in self or key in vars(builtins):
+                    return self.get(key, vars(builtins).get(key))
+                elif key == 'Maybe':
+                    return random.random() < 0.5
+                else:
+                    raise NameError(f'name {key!r} is not defined')
+            finally:
+                tp_base.value = __class__
+
+        def __setitem__(self, key, value, tp_base=tp_base, dict=dict):
+            try:
+                tp_base.value = dict
+                if key != 'Maybe':
+                    return self.update({key:value})
+                else:
+                    raise SyntaxError('cannot assign to Maybe')
+            finally:
+                tp_base.value = __class__
+    tp_base.value = maybe_dict

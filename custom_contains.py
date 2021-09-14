@@ -29,9 +29,10 @@ def make_stc():
     @CFUNCTYPE(py_object, py_object)
     def call(self):
         tptr = capsule.pop('tptr')
+        oval = capsule.pop('oval')
         clean = capsule.pop('clean')
         retv = capsule.pop('retv')
-        tptr.value = None
+        tptr.value = oval
         clean()
         return retv
 
@@ -39,8 +40,9 @@ def make_stc():
 
     def setup_tp_call(typ, ret, cleanup):
         tpcall_pointer = c_void_p.from_address(id(typ) + 16 * BASE_SIZE)
+        oval = tpcall_pointer.value
         tpcall_pointer.value = call_addr
-        capsule.update(tptr=tpcall_pointer, retv=ret, clean=cleanup)
+        capsule.update(tptr=tpcall_pointer, oval=oval, retv=ret, clean=cleanup)
     return setup_tp_call
 
 setup_tp_call = make_stc()

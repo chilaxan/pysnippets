@@ -119,7 +119,7 @@ class FloatObj(PyObject):
     ob_fval: c_double
 
 class ListObj(PyVarObject):
-    ob_item: field(lambda inst:c_ptr[c_void_p*inst.ob_size], c_ptr._size_)
+    ob_item: field(lambda inst:c_ptr[py_object*inst.ob_size], c_ptr._size_)
     allocated: c_ulong
 
 class TupleObj(PyVarObject):
