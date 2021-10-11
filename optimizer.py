@@ -98,8 +98,7 @@ graph = {
   'F' : []
 }
 
-@optimize
-def opt_bfs(graph=graph, node='A'):
+def bfs(graph=graph, node='A'):
   visited = [node]
   queue = [node]
 
@@ -112,19 +111,5 @@ def opt_bfs(graph=graph, node='A'):
         visited.append(neighbour)
         queue.append(neighbour)
 
-print('opt:', timeit(opt_bfs))
-
-def reg_bfs(graph=graph, node='A'):
-  visited = [node]
-  queue = [node]
-
-  while queue:
-    s = queue.pop(0)
-    #print(s, end=" ")
-
-    for neighbour in graph[s]:
-      if neighbour not in visited:
-        visited.append(neighbour)
-        queue.append(neighbour)
-
-print('reg:', timeit(reg_bfs))
+print('reg:', timeit(bfs))
+print('opt:', timeit(optimize(bfs)))

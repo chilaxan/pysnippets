@@ -1,3 +1,5 @@
+#SUPPORTS# <= 3.9 (Tmeta)
+
 import sys, dis
 try:
     from native_ctypes import getmem
@@ -175,68 +177,6 @@ structs = [(0, static_size)] \
 # 4. Now comes the fun part
 # see fishhook
 
-import inspect
-def conv_args(func):
-    code = func.__code__
-    flags = code.co_flags
-    argcount = code.co_argcount
-    converters = []
-    kwarg_conv = None
-    arg_conv = None
-    for name, param in inspect.signature(func).parameters.items():
-        if param.annotation is not param.empty:
-            conv = param.annotation
-        else:
-            conv = lambda a:a
-        if not param.kind & (param.VAR_KEYWORD | param.VAR_POSITIONAL):
-            converters.append(conv)
-        elif param.kind & param.VAR_KEYWORD:
-            flags -= flags & 0x8
-            argcount += 1
-            kwarg_conv = conv
-        elif param.kind & param.VAR_POSITIONAL:
-            flags -= flags & 0x4
-            argcount += 1
-            arg_conv = conv
-    func.__code__ = code.replace(
-        co_flags = flags,
-        co_argcount = argcount,
-    )
-    def wrapper(*args, **kwargs):
-        return func(
-            *(conv(arg) for conv, arg in zip(converters, args[:code.co_argcount])),
-            *() if arg_conv is None else [arg_conv(args[code.co_argcount:])],
-            *() if kwarg_conv is None else [kwarg_conv(kwargs)]
-        )
-    return wrapper
-
-def verify(typ):
-    def wrapper(arg):
-        assert isinstance(arg, typ), f'{arg!r} is not an instance of {typ!r}'
-        return arg
-    return wrapper
-
-from dataclasses import dataclass
-
-@dataclass
-class Foo:
-    a: int = None
-    b: int = None
-
-    @classmethod
-    def from_dict(cls, dct):
-        return cls(**dct)
-
-@conv_args
-def foo_func(a:int, b: tuple, *args: list, **kwargs: Foo.from_dict):
-    print(a, b, args, kwargs)
-
-foo_func('1', 'string', 'a', 'b', a=1, b=2)
-
-@conv_args
-def int_add(a: verify(int), b: verify(int)):
-    return a + b
-
 import dis, sys
 
 old_import = __builtins__.__import__
@@ -250,7 +190,6 @@ def my_import(name, globals=None, locals=None, fromlist=(), level=0):
     code = frame.f_code
     co_code = code.co_code
     lasti = frame.f_lasti
-    #for val in (fromlist or [])
     next_op = dis.opname[co_code[lasti + 2]]
     next_arg = co_code[lasti + 3]
     fl = ', '.join(fromlist) + ' from ' if fromlist else ''
@@ -263,7 +202,7 @@ def my_import(name, globals=None, locals=None, fromlist=(), level=0):
         print(f'importing {fl}{name} in {loc}.{code.co_name}')
     return old_import(name, globals, locals, fromlist, level)
 
-#__builtins__.__import__ = my_import
+__builtins__.__import__ = my_import
 
 import os
 

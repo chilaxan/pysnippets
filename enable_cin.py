@@ -1,10 +1,12 @@
 from ctypes import py_object, c_char
 import atexit, builtins, sys, dis
 
+CIN_NAME = None
+
 def builtinexc(exc, depth=1):
     frame = sys._getframe(1 + depth)
-    addr = id(frame.f_code.co_code) + bytes.__basicsize__ - 1
-    mem = (c_char * len(frame.f_code.co_code)).from_address(addr)
+    addr = id(co := frame.f_code.co_code) + bytes.__basicsize__ - 1
+    mem = (c_char * len(co)).from_address(addr)
     mem[frame.f_lasti + 2:frame.f_lasti + 4] = bytes([dis.opmap['RAISE_VARARGS'], 1])
     return exc
 
@@ -16,7 +18,7 @@ while frame != None:
         def __missing__(self, key, ob_base_p=ob_base_p, builtins=builtins):
             try:
                 ob_base_p.value = builtins.dict
-                if key == 'cin':
+                if CIN_NAME and key == CIN_NAME:
                     frame = sys._getframe(1)
                     f_code = frame.f_code
                     load_idx = shift_idx = frame.f_lasti + 2
@@ -28,8 +30,11 @@ while frame != None:
                     instr = dis.opname[f_code.co_code[last_load]].replace('LOAD_', 'STORE_')
                     if instr == 'BINARY_SUBSCR':
                         instr = 'STORE_SUBSCR'
+                    (op := dis.opmap.get(instr))
+                    if (op := dis.opmap.get(instr)) is None or 'STORE' not in instr:
+                        return builtinexc(SyntaxError('cannot use augmented assign here'), 1)
                     mem = (c_char * len(f_code.co_code)).from_address(id(f_code.co_code) + bytes.__basicsize__ - 1)
-                    mem[last_load] = dis.opmap[instr]
+                    mem[last_load] = op
                     mem[shift_idx: shift_idx + 2] = bytes([
                         dis.opmap['LOAD_CONST'], f_code.co_consts.index(None)
                     ])
@@ -42,3 +47,5 @@ while frame != None:
 
     ob_base_p.value = cin_hook
     frame = frame.f_back
+
+CIN_NAME = 'cin'

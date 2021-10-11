@@ -1,3 +1,5 @@
+#SUPPORTS# <= 3.9
+
 try:
     from native_ctypes import getmem
 except:

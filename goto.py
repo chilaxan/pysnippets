@@ -1,9 +1,8 @@
-try:
-    from native_ctypes import getmem
-except:
-    from ctypes import c_char
-    def getmem(addr, size):
-        return memoryview((c_char*size).from_address(addr)).cast('B')
+#SUPPORTS# <= 3.9
+
+from ctypes import c_char
+def getmem(addr, size):
+    return memoryview((c_char*size).from_address(addr)).cast('B')
 
 __all__ = ['goto', 'label']
 

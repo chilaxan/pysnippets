@@ -1,3 +1,5 @@
+#SUPPORTS# <= 3.9
+
 import sys
 from ctypes import c_char
 

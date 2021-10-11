@@ -1,3 +1,5 @@
+#SUPPORTS# <= 3.9
+
 import sys
 import fishhook
 import f_locals

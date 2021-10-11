@@ -2,7 +2,6 @@ from asm_hook import hook
 from native_ctypes import PyTypeObject
 from ctypes import *
 from _ctypes import PyObj_FromPtr
-from framehacks import builtinexc
 
 dict_struct = PyTypeObject.from_address(id(dict))
 _FuncPtr = type(pythonapi.Py_IncRef)
@@ -17,6 +16,12 @@ def protect(func):
         except Exception as e:
             return builtinexc(e, 1)
     return new_func
+
+def builtinexc(exc, level=0):
+    frame = sys._getframe(2 + level)
+    mem = getmem(id(frame.f_code.co_code) + bytes.__basicsize__ - 1, len(frame.f_code.co_code))
+    mem[frame.f_lasti + 2:frame.f_lasti + 4] = bytes([dis.opmap['RAISE_VARARGS'], 1])
+    return exc
 
 @hook(dict_init, restype=c_int, argtypes=[py_object, c_void_p, c_void_p])
 @protect

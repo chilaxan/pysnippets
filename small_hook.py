@@ -1,9 +1,9 @@
-TUPLE_HEADER = tuple.__basicsize__
 BYTES_HEADER = bytes.__basicsize__ - 1
 PTR_SIZE = tuple.__itemsize__
 ENDIAN = ['little','big'][1%memoryview(b'\1\0').cast('h')[0]]
 
 Py_TPFLAGS_VALID_VERSION_TAG = 1 << 19
+Py_TPFLAGS_IMMUTABLETYPE = 1 << 8 # 3.10
 Py_TPFLAGS_HEAPTYPE = 1 << 9
 
 def sizeof(obj):
@@ -35,7 +35,7 @@ def alloc(size, _storage=[]):
     return id(_storage[-1]) + BYTES_HEADER
 
 def PyType_Modified(cls):
-    cls_mem = getmem(id(cls), sizeof(cls), 'L')
+    cls_mem = getmem(id(cls), sizeof(cls), 'il'[PTR_SIZE==8])
     flags = cls.__flags__
     flag_offset = cls_mem.tolist().index(flags)
     if not cls.__flags__ & Py_TPFLAGS_VALID_VERSION_TAG:
@@ -45,7 +45,7 @@ def PyType_Modified(cls):
     cls_mem[flag_offset] &= ~Py_TPFLAGS_VALID_VERSION_TAG
 
 def get_structs(htc=type('',(),{'__slots__':()})):
-    htc_mem = getmem(id(htc), sizeof(htc), 'L')
+    htc_mem = getmem(id(htc), sizeof(htc), 'il'[PTR_SIZE==8])
     last = None
     for ptr, idx in sorted([(ptr, idx) for idx, ptr in enumerate(htc_mem)
             if id(htc) < ptr < id(htc) + sizeof(htc)]):
@@ -80,6 +80,7 @@ def hook(cls, name=None, attr=None):
             cache[id(attr.__code__)] = getattr(cls, name)
         try:
             cls_mem[flag_offset] |= Py_TPFLAGS_HEAPTYPE
+            cls_mem[flag_offset] &= ~Py_TPFLAGS_IMMUTABLETYPE
             setattr(cls, name, attr)
         finally:
             cls_mem[flag_offset] = flags

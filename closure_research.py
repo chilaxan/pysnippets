@@ -1,3 +1,5 @@
+#SUPPORTS# <= 3.9
+
 # gadget.__code__ = (gadget:=lambda v,*s:(v,v,v)).__code__.replace(co_code=b'|\0|\1p\12\x88\0n\4\\\1\x89\0S\0')
 
 # freevars = f->f_fastlocals + co->co_nlocals

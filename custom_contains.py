@@ -1,3 +1,6 @@
+#SUPPORTS# <= 3.9
+
+
 from ctypes import *
 import dis
 

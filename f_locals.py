@@ -25,8 +25,7 @@ class f_locals(MutableMapping):
 
     def _getlocp(self):
         addr = id(self.frame) + FrameType.__basicsize__ - base_size
-        buffer = addr.to_bytes(base_size, sys.byteorder)
-        return POINTER(py_object).from_buffer_copy(buffer)
+        return pointer(py_object.from_address(addr))
 
     def __getitem__(self, key):
         names = list(self)
