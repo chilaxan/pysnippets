@@ -66,14 +66,20 @@ def orig(*args, **kwargs):
         frame = frame.f_back
     raise RuntimeError('original implementation not found')
 
+def allocate_structs(cls):
+    cls_mem = getmem(id(cls), sizeof(cls), 'il'[PTR_SIZE==8])
+    for offset, size in get_structs():
+        if not cls_mem[offset]:
+            cls_mem[offset] = alloc(size)
+    for subcls in type(cls).__subclasses__(cls):
+        allocate_structs(subcls)
+    return cls_mem
+
 def hook(cls, name=None, attr=None):
     def wrapper(attr):
         nonlocal name
         name = name or attr.__name__
-        cls_mem = getmem(id(cls), sizeof(cls), 'L')
-        for offset, size in get_structs():
-            if not cls_mem[offset]:
-                cls_mem[offset] = alloc(size)
+        cls_mem = allocate_structs(cls)
         flags = cls.__flags__
         flag_offset = cls_mem.tolist().index(flags)
         if hasattr(attr, '__code__') and hasattr(cls, name):

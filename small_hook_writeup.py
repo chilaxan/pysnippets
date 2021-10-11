@@ -54,7 +54,7 @@ def alloc(size, _storage=[]):
 
 def PyType_Modified(cls):
     '''pure python implementation of `PyType_Modified` (see typeobject.c)'''
-    cls_mem = getmem(id(cls), sizeof(cls), 'L')
+    cls_mem = getmem(id(cls), sizeof(cls), 'il'[PTR_SIZE==8])
     flags = cls.__flags__
     flag_offset = cls_mem.tolist().index(flags)
     if not cls.__flags__ & Py_TPFLAGS_VALID_VERSION_TAG:
@@ -65,7 +65,7 @@ def PyType_Modified(cls):
 
 def get_structs(htc=type('',(),{'__slots__':()})):
     '''generates the offset and size of internal `tp_as_*` structs'''
-    htc_mem = getmem(id(htc), sizeof(htc), 'L')
+    htc_mem = getmem(id(htc), sizeof(htc), 'il'[PTR_SIZE==8])
     last = None
     for ptr, idx in sorted([(ptr, idx) for idx, ptr in enumerate(htc_mem)
             if id(htc) < ptr < id(htc) + sizeof(htc)]):
@@ -87,15 +87,22 @@ def orig(*args, **kwargs):
         frame = frame.f_back
     raise RuntimeError('original implementation not found')
 
+def allocate_structs(cls):
+    '''recursively allocates tp_as_* structs'''
+    cls_mem = getmem(id(cls), sizeof(cls), 'il'[PTR_SIZE==8])
+    for offset, size in get_structs():
+        if not cls_mem[offset]:
+            cls_mem[offset] = alloc(size)
+    for subcls in type(cls).__subclasses__(cls):
+        allocate_structs(subcls)
+    return cls_mem
+
 def hook(cls, name=None, attr=None):
     '''where the magic happens'''
     def wrapper(attr):
         nonlocal name
         name = name or attr.__name__
-        cls_mem = getmem(id(cls), sizeof(cls), 'L') # gets a writable reference to the class memory
-        for offset, size in get_structs():
-            if not cls_mem[offset]:
-                cls_mem[offset] = alloc(size) # allocates any structs that are missing
+        cls_mem = allocate_structs(cls)
         flags = cls.__flags__ # store original flags
         flag_offset = cls_mem.tolist().index(flags)
         if hasattr(attr, '__code__') and hasattr(cls, name):
