@@ -57,12 +57,12 @@ def hook(cfunc, restype=c_int, argtypes=()):
         return injected
     return wrapper
 
-@hook(pythonapi.PyDict_SetDefault, restype=py_object, argtypes=[py_object]*3)
-def setdefault(self, key, value):
-    if key == 'MAGICVAL':
-        return self
-    return pythonapi.PyDict_SetDefault(self, key, value)
+# @hook(pythonapi.PyDict_SetDefault, restype=py_object, argtypes=[py_object]*3)
+# def setdefault(self, key, value):
+#     if key == 'MAGICVAL':
+#         return self
+#     return pythonapi.PyDict_SetDefault(self, key, value)
 
-pythonapi.PyUnicode_InternFromString.restype = py_object
-interned = pythonapi.PyUnicode_InternFromString(b'MAGICVAL')
-setdefault.unhook()
+# pythonapi.PyUnicode_InternFromString.restype = py_object
+# interned = pythonapi.PyUnicode_InternFromString(b'MAGICVAL')
+# setdefault.unhook()

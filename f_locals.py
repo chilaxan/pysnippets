@@ -1,4 +1,9 @@
-from ctypes import *
+from ctypes import (
+    sizeof, c_void_p,
+    py_object, c_ssize_t,
+    pointer, POINTER,
+    addressof
+)
 from _ctypes import Py_INCREF, Py_DECREF
 from collections.abc import MutableMapping
 import sys
@@ -8,32 +13,39 @@ FrameType = type(sys._getframe())
 
 Null = type('',(),{'__repr__':lambda s:'<NULL>'})()
 
+def cast(cobj, ctyp):
+    # custom `cast` function (with no safety checks)
+    return ctyp.from_address(addressof(cobj))
+
 class f_locals(MutableMapping):
     __invert__ = None
     def __init__(self, frame):
         self.frame = frame
-        self._r = False
+        self.__lp = None
 
     def __repr__(self):
-        if self._r:
+        if hasattr(self, '_r'):
             return '...'
         self._r = True
         try:
-            return f'locals({dict(self.items())})'
+            return f'locals: {", ".join(f"{k}={v!r}" for k, v in self.items())}'
         finally:
-            self._r = False
+            del self._r
 
-    def _getlocp(self):
-        addr = id(self.frame) + FrameType.__basicsize__ - base_size
-        return pointer(py_object.from_address(addr))
+    @property
+    def _lp(self):
+        if self.__lp is None:
+            addr = id(self.frame) + FrameType.__basicsize__ - base_size
+            # get offset for locals array on `self.frame` object
+            self.__lp = (py_object*len(self)).from_address(addr)
+        return self.__lp
 
     def __getitem__(self, key):
         names = list(self)
         if key not in names:
             raise KeyError(key)
-        loc_p = self._getlocp()
         try:
-            return loc_p[names.index(key)]
+            return self._lp[names.index(key)]
         except ValueError:
             return Null
 
@@ -41,23 +53,21 @@ class f_locals(MutableMapping):
         names = list(self)
         if key not in names:
             raise KeyError(key)
-        loc_p = self._getlocp()
+        del self[key]
         if value is not Null:
             Py_INCREF(value)
-            loc_p[names.index(key)] = value
-        else:
-            del self[key]
+            self._lp[names.index(key)] = value
 
     def __delitem__(self, key):
         names = list(self)
         if key not in names:
             raise KeyError(key)
-        loc_p = self._getlocp()
+        idx = names.index(key)
         try:
-            Py_DECREF(loc_p[names.index(key)])
+            Py_DECREF(self._lp[idx])
         except ValueError:
             pass
-        cast(loc_p, POINTER(c_void_p))[names.index(key)] = None
+        cast(self._lp, (c_void_p*len(self)))[idx] = None
 
     def __iter__(self):
         return iter(self.frame.f_code.co_varnames)
