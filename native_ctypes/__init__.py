@@ -92,7 +92,7 @@ class c_char_p(c_void_p):
     def _del_(self):
         addr = super()._get_()
         if is_allocated(addr):
-            free(o_addr)
+            free(addr)
         super()._del_()
 
 class py_object(c_void_p):

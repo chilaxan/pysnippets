@@ -106,7 +106,9 @@ class c_data(metaclass=c_meta):
             raise
 
     def __repr__(self):
-        return f'{type(self)}({flatten(self.value)!r})'
+        if getattr(self, '_addr', None) is not None:
+            return f'{type(self)}({flatten(self.value)!r})'
+        return f'{type(self)}(<freed>)'
 
     def _pre_init_(self, args):
         pass
