@@ -177,6 +177,8 @@ class complex_data(c_data):
             return super().__getattribute__(attr)
         else:
             raw = self.by_name(attr)
+            if hasattr(type(raw), 'length'):
+                return raw
             if type(raw).__base__ == c_data:
                 return raw.value
             else:

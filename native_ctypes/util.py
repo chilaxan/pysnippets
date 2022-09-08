@@ -56,7 +56,7 @@ def addressof(obj):
 rec = type('Rec', (), {'__repr__':lambda s:'...'})()
 
 def flatten(value, level=0):
-	if level >= 3:
+	if level >= 4:
 		return rec
 	if hasattr(value, 'value') and hasattr(value, '_addr'):
 		value = flatten(value.value, level + 1)
