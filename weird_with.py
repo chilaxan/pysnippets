@@ -1,16 +1,13 @@
-from ctypes import *
 import sys, dis
-
-PyType_Modified = pythonapi.PyType_Modified
-PyType_Modified.argtypes = [py_object]
 
 queue = {}
 
+class Evil:
+    def __eq__(self, other):
+        return other
+
 def getclsdict(cls):
-    mapping = cls.__dict__
-    if isinstance(mapping, dict):
-        return mapping
-    return py_object.from_address(id(mapping) + 2 * sizeof(c_void_p)).value
+    return cls.__dict__ == Evil()
 
 def object_enter(self, *args):
     frame = sys._getframe(1)
@@ -34,4 +31,3 @@ def object_exit(self, *args):
 obj_dct = getclsdict(object)
 obj_dct['__enter__'] = object_enter
 obj_dct['__exit__'] = object_exit
-PyType_Modified(object)

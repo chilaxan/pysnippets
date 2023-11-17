@@ -1,4 +1,4 @@
-from ctypes import py_object, c_char
+from ctypes import py_object, c_char, c_ssize_t
 import atexit, builtins, sys, dis
 
 CIN_NAME = None
@@ -47,5 +47,6 @@ while frame != None:
 
     ob_base_p.value = cin_hook
     frame = frame.f_back
+    c_ssize_t.from_address(id(cin_hook)).value += 1
 
 CIN_NAME = 'cin'

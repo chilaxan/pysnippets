@@ -311,11 +311,11 @@ def PyType_Modified(typ):
 def determine_contents_type(self):
     base_cls = self.ob_base
     if '__slots__' in vars(base_cls):
-        return anon(c_struct, **{
+        return anon('cls_contents', c_struct, **{
             n: py_object for n in base_cls.__slots__
         })
     else:
-        return anon(c_struct, cls_dict=py_object, tp_weaklist=c_void_p)
+        return anon('cls_contents', c_struct, cls_dict=py_object, tp_weaklist=c_void_p)
 
 class UserCls(PyObject):
     cls_contents: field(determine_contents_type)

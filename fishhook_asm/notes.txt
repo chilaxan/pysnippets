@@ -1,0 +1,24 @@
+use keystone for assembling and capstone for disassembling
+
+keystone: pip3 install keystone-engine
+capstone: pip3 install capstone --no-binary :all: # needed to force compile for arm m2
+
+ARM64:
+    keystone mode:
+        Little Endian: KS_ARCH_ARM64, KS_MODE_LITTLE_ENDIAN
+        Big Endian: KS_ARCH_ARM64, KS_MODE_BIG_ENDIAN
+
+    capstone mode:
+        Little Endian: CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN
+        Big Endian: CS_ARCH_ARM64, CS_MODE_BIG_ENDIAN
+
+AMD64|x86:
+    keystone mode:
+        Little Endian 16 bit: KS_ARCH_X86, KS_MODE_16 + KS_MODE_LITTLE_ENDIAN
+        Little Endian 32 bit: KS_ARCH_X86, KS_MODE_32 + KS_MODE_LITTLE_ENDIAN
+        Little Endian 64 bit: KS_ARCH_X86, KS_MODE_64 + KS_MODE_LITTLE_ENDIAN
+
+    capstone mode:
+        Little Endian 16 bit: CS_ARCH_X86, CS_MODE_16 + CS_MODE_LITTLE_ENDIAN
+        Little Endian 32 bit: CS_ARCH_X86, CS_MODE_32 + CS_MODE_LITTLE_ENDIAN
+        Little Endian 64 bit: CS_ARCH_X86, CS_MODE_64 + CS_MODE_LITTLE_ENDIAN

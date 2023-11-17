@@ -64,12 +64,15 @@ class tuple_patch:
 
     for method in dir([]):
         if not ((method.startswith('__') and method.endswith('__')) or method in dir(())):
-            exec(f'''def {method}(self, *args, **kwargs):
+            def func(self, *args, n=method, **kwargs):
                 temp = list(self)
                 try:
-                    ret = getattr(temp, {method!r})(*args, **kwargs)
+                    ret = getattr(temp, n)(*args, **kwargs)
                 except Exception as ex:
                     raise patch_exc(ex)
                 replace_tuple(self, tuple(temp))
-                return ret''')
-    del method
+                return ret
+            func.__name__ = method
+            func.__qualname__ = method
+            locals()[method] = func
+    del method, func

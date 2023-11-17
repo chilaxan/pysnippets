@@ -269,3 +269,189 @@ def new_format(self, *args, **kwargs):
 
 load_off3(str.__dict__)['format'] = new_format
 PyType_Modified(str)
+
+def get_idx(col, val):
+    try:
+        return col.index(val)
+    except ValueError:
+        return None
+
+def replace_consts(*vals):
+    def wrapper(func):
+        consts = [*func.__code__.co_consts]
+        for oval, nval in vals:
+            if oval in func.__code__.co_consts:
+                consts[func.__code__.co_consts.index(oval)] = nval
+        func.__code__ = func.__code__.replace(
+            co_consts=tuple(consts)
+        )
+        return func
+    return wrapper
+
+@replace_consts((None, 1))
+def test():
+    print('yeet')
+
+print(test())
+
+def inject_constant(code, name, val):
+    byc = code.co_code
+    new_inst = bytes([100, len(code.co_consts)])
+    for op, names in [(116, code.co_names), (124, code.co_varnames)]:
+        if name in names:
+            idx = names.index(name)
+            byc = byc.replace(bytes([op, idx]), new_inst)
+    return code.replace(co_consts=code.co_consts + (val,), co_code=byc)
+
+def isvalidptr(addr, size=1):
+    import os
+    r, w = os.pipe()
+    try:
+        return os.write(w, getmem(addr,size)) == size
+    except OSError:
+        return False
+    finally:
+        os.close(r)
+        os.close(w)
+
+def get_cls_dict(cls, E=type('',(),{'__eq__':lambda s,o:o})()):
+    return cls.__dict__ == E
+
+import typing
+
+@lambda c:c()
+class __annotations__(dict):
+    def __setitem__(self, name, value):
+        if isinstance(value, typing.Callable):
+            try:
+                func = globals()[name]
+                args = list(value.__args__)
+                annots = func.__annotations__
+                annots['return'] = args.pop()
+                for varname in func.__code__.co_varnames:
+                    if not args: break
+                    annots[varname] = args.pop(0)
+            except:pass
+        super().__setitem__(name, value)
+
+f: typing.Callable[int, str] = lambda x: chr(x)
+
+current_frame = next(g:=(g.gi_frame.f_back for()in[()]))
+
+getframe=lambda i=0:[*(g:=(f:=g.gi_frame.f_back for()in[()]))]and[f:=f.f_back for()in[()]*(i+1)][i]
+
+
+s=lambda x,r=range:x.translate([*r(65),*r(97,123),*r(91,97),*r(65,91)])
+
+def s():
+    v=None
+    while 1:
+        v = (yield v).translate([*(r:=range)(65),*r(97,123),*r(91,97),*r(65,91)])
+
+(s:=s().send)(None)
+
+class frame:
+    def __init__(self, f_back):
+        self.f_back = f_back
+
+def new_frame():
+    f = None
+    while 1:
+        f = frame(f)
+        yield f
+
+new_frame = new_frame().__next__
+
+
+from dis import dis
+dis("a = b = c = d = 10")
+print()
+dis("d = (c := (b := (a := 10)))")
+
+# Use After Free in io.BufferedReader
+io = open.__self__
+
+class UAF(io._RawIOBase):
+    def readinto(self, buf):
+        self.buf = buf.cast('P')
+    def readable(self):
+        return True
+
+u = UAF()
+b = io.BufferedReader(u, 56)
+b.read(1) # store view of buffer on `u` (calls `readinto`)
+# use `__init__` to free internal buffer instead of relying on GC
+u.view = b.__init__(u) or bytearray()
+# at this point, if successful, `u.buf` is the memory that backs `u.view`
+u.buf[2] = (pow(2, tuple.__itemsize__ * 8) // 2) - 1
+u.memory = memoryview(u.view)
+
+def getmem(addr, size, fmt='c'):
+    return u.memory[addr: addr + size].cast(fmt)
+
+def load_addr(addr):
+    T = (None,)
+    offset = id(T) + tuple.__basicsize__
+    container = getmem(id(T) + tuple.__basicsize__, tuple.__itemsize__, 'P')
+    try:
+        container[0] = addr
+        return T[0]
+    finally:
+        container[0] = id(None)
+
+print(load_addr(id(1)))
+
+import sys, inspect
+def get_signature(frame):
+    argvals = inspect.getargvalues(frame)
+    args = tuple(argvals.locals.get(name) for name in argvals.args if name in (func.__kwdefaults__) or {}) \
+            + argvals.locals.get(argvals.varargs) if argvals.varargs else ()
+
+    kwargs = argvals.locals.get(argvals.keywords) if argvals.keywords else {}
+    for name in argvals.args:
+        if name in func.__kwdefaults__:
+            kwargs[name] = argvals.locals.get(name)
+    return tuple(map(type, args)), tuple((k, type(v)) for k, v in kwargs.items())
+
+def dispatch(*args, **kwargs):
+    def dispatch_inner(func):
+        func.sig = (args, tuple(kwargs.items()))
+        return func
+    return dispatch_inner
+
+class DispatchDict(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dispatch = {}
+    def __setitem__(self, key, value):
+        if not hasattr(value, 'sig'):
+            if key in self.dispatch:
+                self.dispatch[key]['default'] = value
+            else:
+                return super().__setitem__(key, value)
+        ftbl = self.dispatch.setdefault(key, {})
+        ftbl[value.sig] = value
+        def inner(*a, **k):
+            args, kwargs = get_signature(sys._getframe())
+            try:
+                func = ftbl[args[1:], kwargs]
+            except KeyError:
+                func = ftbl['default']
+            return func(*a, **k)
+        super().__setitem__(key, inner)
+
+class Dispatchable(type):
+    def __prepare__(*args):
+        return DispatchDict()
+
+class Foo(metaclass=Dispatchable):
+    @dispatch(int, int)
+    def method(self, a, b):
+        print(a - b)
+
+    @dispatch(str, str)
+    def method(self, a, b):
+        print(a + b)
+
+    def method(self, a, b):
+        print('default case')

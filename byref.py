@@ -62,8 +62,9 @@ class magic_globals(dict):
             elif key in self.mglobs:
                 self._frame.f_globals[self.mglobs[key]] = val
             else:
-                raise RuntimeError('How Did We Get Here?')
-        self.o_mp[key] = val
+                raise RuntimeError('Byref Var did not recieve direct reference')
+        else:
+            self.o_mp[key] = val
 
     def __getitem__(self, key):
         if isinstance(key, str) and key[0] == '!':
@@ -73,7 +74,7 @@ class magic_globals(dict):
             elif key in self.mglobs:
                 return self._frame.f_globals[self.mglobs[key]]
             else:
-                raise RuntimeError('How Did We Get Here?')
+                raise RuntimeError('Byref Var did not recieve direct reference')
         return self.o_mp[key]
 
 class Byref:
@@ -102,7 +103,7 @@ class Byref:
                 co_code[i] = dis.opmap[opname.split('_')[0] + '_GLOBAL']
                 co_code[i+1] = len(func.__code__.co_names) + names.index(f'!{name}')
         ncode = func.__code__.replace(co_code=bytes(co_code), co_names=func.__code__.co_names + tuple(names))
-        nfunc = type(func)(ncode, magic_globals(orig_globals))
+        nfunc = type(func)(ncode, magic_globals(orig_globals), None, func.__defaults__)
         @wraps(nfunc)
         def wrapper(*a, **k):
             caller_frame = sys._getframe(1)
@@ -112,22 +113,26 @@ class Byref:
             opname = dis.opname[co_code[idx]]
             oparg = co_code[idx + 1]
             if opname == 'CALL_FUNCTION':
-                # stack: args = obj * oparg
                 segments = find_segments(co_code, idx - 2, oparg)
             elif opname == 'CALL_FUNCTION_EX':
-                # stack: ?dict(kwargs) if oparg, tuple(args)
-                seg, *_ = find_segments(co_code, idx - 2, oparg + 1)
+                # does not work if kwargs are present (fml edge cases)
+                seg, *kwargs = find_segments(co_code, idx - 2, oparg + 1)
                 del seg[-2:] # delete LIST_TO_TUPLE
                 if seg[0] == dis.opmap['BUILD_LIST']:
                     raise RuntimeError('Byref Var must come before expanding postional argumets')
                 while seg[-2] == dis.opmap['LIST_EXTEND']:
                     del seg[-2:] # delete LIST_EXTEND
-                    del seg[-len(find_segments(seg, len(seg) - 2, 1)[0]):]
+                    del seg[-len(*find_segments(seg, len(seg) - 2, 1)):]
                 oparg = seg[-1]
                 del seg[-2:] # delete BUILD_LIST
-                segments = find_segments(seg, len(seg) - 2, oparg)
+                if not seg:
+                    segments = []
+                else:
+                    segments = find_segments(seg, len(seg) - 2, oparg)
+                if kwargs:
+                    breakpoint()
             elif opname == 'CALL_FUNCTION_KW':
-                # stack: tuple(kw_names), obj * oparg
+                # does not work if args are present additional to the kwargs (fml edge cases)
                 segments = find_segments(co_code, idx - 2, oparg + 1)[:-1]
             for (varname, o), seg in zip(pairs.items(), segments):
                 if len(seg) == 2 and isinstance(o, Byref):
@@ -149,9 +154,9 @@ class Byref:
 byref = Byref()
 
 @byref
-def foo(ref_x: byref):
+def inc(ref_x: byref):
     ref_x += 1
 
-a = 1
-foo(a)
+a = 0
+inc(a)
 print(a)

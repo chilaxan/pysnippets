@@ -12,6 +12,7 @@ import dis
 gadget = lambda v,*s:None # freevars = frame.stack
 gadget.__code__ = gadget.__code__.replace(
     co_stacksize=3,
+    co_nlocals=0,
     co_code=bytes([
         dis.opmap['LOAD_FAST'], 0,              # 00: frame.stack[0] = v
         dis.opmap['LOAD_FAST'], 1,              # 02: frame.stack[1] = s
@@ -34,6 +35,7 @@ import dis
 load = lambda *a:None # freevars = frame.stack
 load.__code__ = load.__code__.replace(
     co_stacksize=4,
+    co_nlocals=0,
     co_code=bytes([
         dis.opmap['BUILD_LIST'], 0,     # 00: frame.stack[0] = list()
         dis.opmap['LOAD_FAST'], 0,      # 02: frame.stack[1] = a

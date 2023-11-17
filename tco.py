@@ -1,4 +1,8 @@
 import dis
+import sys
+
+# currently does not handle EXTENDED_ARG properly
+# needs new logic and rewrite
 
 def decompile(byc):
     jmp_tbl = {}
@@ -7,29 +11,40 @@ def decompile(byc):
     while idx < len(byc):
         op, arg = byc[idx: idx + 2]
         idx += 2
+        nExt = 0
         while dis.opname[op] == 'EXTENDED_ARG':
             oarg = arg
             op, arg = byc[idx: idx + 2]
             arg |= oarg << 8
             idx += 2
-        decomp.append([dis.opname[op], arg])
+            nExt += 1
+        name = dis.opname[op]
+        if 'JUMP' in name and name != 'JUMP_FORWARD':
+            arg -= nExt
+        decomp.append([name, arg])
     for idx, ((op, arg), lst) in enumerate(zip(decomp, decomp)):
+        narg = arg // (2 if sys.version_info < (3, 10) else 1)
         if op == 'JUMP_FORWARD':
-            jmp_tbl[id(lst)] = decomp[idx + (arg // 2) + 1]
+            jmp_tbl[id(lst)] = decomp[idx + narg + 1]
         elif 'JUMP' in op:
-            jmp_tbl[id(lst)] = decomp[arg // 2]
+            jmp_tbl[id(lst)] = decomp[narg]
     return decomp, jmp_tbl
 
 def insert_extensions(decomp):
-    while any(filter(lambda t:t[1] > 255, decomp)):
+    cpy = decomp.copy()
+    while True:
         for idx, (op, arg) in enumerate(decomp[:]):
             nshift = (arg.bit_length() / 8).__ceil__()
             if op != 'JUMP_FORWARD' and 'JUMP' in op and nshift:
-                arg += (nshift - 1) * 2
+                arg += (nshift - 1) * (2 if sys.version_info < (3, 10) else 1)
             if arg > 255:
                 decomp[idx][1] = arg & 255
                 decomp.insert(idx, ['EXTENDED_ARG', arg >> 8])
                 break
+        if cpy != decomp:
+            cpy = decomp.copy()
+        else:
+            break
 
 def find(decomp, dest):
     for idx, lst in enumerate(decomp):
@@ -43,14 +58,13 @@ def recompile(decomp, jmp_tbl):
             offset = (idx + 1) if op == 'JUMP_FORWARD' else 0
             dest_op = jmp_tbl.get(id(lst))
             if (dest := find(decomp, dest_op)) is not None:
-                arg = lst[1] = (dest - offset) * 2
+                lst[1] = (dest - offset) * (2 if sys.version_info < (3, 10) else 1)
     insert_extensions(decomp) # insert EXTENDED_ARG for JUMPs
     return b''.join(bytes([dis.opmap[op], arg]) for op, arg in decomp)
 
-def compute_stack_effect(decomp, jmp_tbl, end, start):
+def compute_stack_effect(segment, jmp_tbl):
     SE = 0
     idx = 0
-    segment = decomp[start + 1: end]
     while idx < len(segment):
         (op, arg) = lst = segment[idx]
         isjump = 'JUMP' in op
@@ -83,7 +97,7 @@ def find_tco_segment(code, decomp, jmp_tbl):
         for b in range(idx + 1):
             bop, barg = decomp[idx - b]
             if get_name(code, bop, barg) == code.co_name and \
-               arg == compute_stack_effect(decomp, jmp_tbl, idx, idx - b):
+               arg == compute_stack_effect(decomp[idx - b + 1: idx], jmp_tbl):
                 return arg, b, idx
 
 def single_pass_tco(code):
@@ -113,17 +127,26 @@ def fact(n, acc=1):
         return acc
     return fact(n - 1, n * acc)
 
-dis.dis(fact)
+#dis.dis(fact)
 
 def fib(n=1000, a=0, b=1):
     if n == 0:
         return a
     if n == 1:
         return b
-    return fib(n - 1, b, a + b);
+    return fib(n - 1, b, a + b)
 
-import timeit
-import sys
-sys.setrecursionlimit(2000)
-print(timeit.timeit(fib, number=10000))
-print(timeit.timeit(tco(fib), number=10000))
+#import timeit
+#import sys
+#sys.setrecursionlimit(2000)
+#print(timeit.timeit(fib, number=10000))
+#print(timeit.timeit(tco(fib), number=10000))
+
+def test():
+    import gc
+    for obj in gc.get_objects():
+        if hasattr(obj, '__code__'):
+            ocode = obj.__code__.co_code
+            ncode = recompile(*decompile(ocode))
+            assert ocode == ncode, f'Fail: {obj.__name__}'
+            print(f'Success: {obj.__name__}')

